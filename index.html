@@ -732,7 +732,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overflow:hid
 <body>
 
 <!-- ══ AUTH SCREEN ══ -->
-<div id="auth-screen" style="position:fixed;inset:0;background:var(--bg);z-index:9000;display:flex;align-items:center;justify-content:center;">
+<div id="auth-screen" style="position:fixed;inset:0;background:var(--bg);z-index:9000;display:none;align-items:center;justify-content:center;">
   <div class="auth-card">
     <div class="auth-logo">ArchiFlow</div>
     <div class="auth-tagline">Gestión de estudio de arquitectura · Alicante</div>
@@ -5516,7 +5516,7 @@ async function doForgotPassword() {
 async function doLogout() {
   await _sb.auth.signOut();
   currentUser = null; currentProfile = null;
-  document.getElementById('auth-screen').style.display='flex';
+  showAuth();
   document.getElementById('app-shell').style.display = 'none';
 }
 
@@ -5534,14 +5534,23 @@ function getEl(id) { return document.getElementById(id); }
 function showApp() {
   const auth = getEl('auth-screen');
   const app  = getEl('app-shell');
-  if (auth) auth.style.display='none';
-  if (app)  app.style.display = '';
+  if (auth) {
+    auth.style.display      = 'none';
+    auth.style.zIndex       = '-1';
+    auth.style.pointerEvents = 'none';
+    auth.style.visibility   = 'hidden';
+  }
+  if (app) {
+    app.style.display       = '';
+    app.style.pointerEvents = 'auto';
+    app.style.visibility    = 'visible';
+  }
 }
 
 function showAuth() {
   const auth = getEl('auth-screen');
   const app  = getEl('app-shell');
-  if (auth) auth.style.display='flex';
+  if (auth) auth.style.cssText = 'position:fixed;inset:0;background:var(--bg);z-index:9000;display:flex;align-items:center;justify-content:center;';
   if (app)  app.style.display = 'none';
 }
 
@@ -6310,8 +6319,11 @@ function addActivity(txt, icon='📋', bg='var(--bg3)') {
 // ══ INIT ══
 // Wait for DOM before touching any elements
 window.addEventListener('DOMContentLoaded', () => {
+  // Start: auth visible, app hidden
+  const authEl = document.getElementById('auth-screen');
   const appShell = document.getElementById('app-shell');
   if (appShell) appShell.style.display = 'none';
+  if (authEl) authEl.style.display = 'flex'; // show login by default
 
   // Check for password recovery flow (hash from email link)
   const hash = window.location.hash;
