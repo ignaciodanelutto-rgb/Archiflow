@@ -5440,15 +5440,61 @@ function switchAuthTab(tab) {
 }
 
 async function doLogin() {
-  const email = document.getElementById('login-email').value.trim();
-  const pass  = document.getElementById('login-pass').value;
+  const email = document.getElementById('login-email')?.value?.trim();
+  const pass  = document.getElementById('login-pass')?.value;
   const errEl = document.getElementById('login-error');
   const btn   = document.getElementById('login-btn');
-  errEl.classList.remove('show');
-  if (!email || !pass) { errEl.textContent='Introduce email y contraseña'; errEl.classList.add('show'); return; }
-  btn.disabled = true; btn.textContent = 'Entrando…';
-  const { error } = await _sb.auth.signInWithPassword({ email, password: pass });
-  if (error) { errEl.textContent = translateAuthError(error.message); errEl.classList.add('show'); btn.disabled=false; btn.textContent='Entrar'; }
+  if (errEl) errEl.classList.remove('show');
+  if (!email || !pass) {
+    if (errEl) { errEl.textContent='Introduce email y contraseña'; errEl.classList.add('show'); }
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = 'Entrando…'; }
+
+  try {
+    const { data, error } = await _sb.auth.signInWithPassword({ email, password: pass });
+
+    if (error) {
+      if (errEl) { errEl.textContent = translateAuthError(error.message); errEl.classList.add('show'); }
+      if (btn) { btn.disabled=false; btn.textContent='Entrar'; }
+      return;
+    }
+
+    // Login OK — onAuthStateChange should fire, but as fallback trigger manually
+    if (data?.session) {
+      // Give onAuthStateChange 2 seconds to fire naturally
+      const fired = await new Promise(resolve => {
+        const t = setTimeout(() => resolve(false), 2000);
+        const unsub = _sb.auth.onAuthStateChange((event, session) => {
+          if (event === 'SIGNED_IN') { clearTimeout(t); unsub?.data?.subscription?.unsubscribe(); resolve(true); }
+        });
+      });
+
+      if (!fired) {
+        // Manual fallback — init app directly
+        console.log('onAuthStateChange did not fire — manual init');
+        currentUser = data.session.user;
+        try { await loadProfile(); } catch(e) { console.warn(e); }
+        showApp();
+        try {
+          await loadAllData();
+          setupRealtimeSubscriptions();
+          setupPresence();
+          updateTopbarUser();
+          renderSidebar();
+          renderDashboard();
+          nav('dashboard');
+        } catch(e) {
+          console.error('Manual init error:', e);
+          showToast('Error al cargar datos: ' + e.message);
+        }
+      }
+    }
+  } catch(e) {
+    console.error('Login error:', e);
+    if (errEl) { errEl.textContent = 'Error de conexión. Comprueba tu internet.'; errEl.classList.add('show'); }
+    if (btn) { btn.disabled=false; btn.textContent='Entrar'; }
+  }
 }
 
 async function doRegister() {
@@ -5554,8 +5600,13 @@ function showAuth() {
   if (app)  app.style.display = 'none';
 }
 
+let appInitialized = false;
+
 _sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
+    // Prevent double initialization if manual fallback already ran
+    if (appInitialized && currentUser?.id === session.user.id) return;
+    appInitialized = true;
     currentUser = session.user;
     try { await loadProfile(); } catch(e) { console.warn('loadProfile:', e); }
     showApp();
@@ -5567,8 +5618,13 @@ _sb.auth.onAuthStateChange(async (event, session) => {
       renderSidebar();
       renderDashboard();
       nav('dashboard');
+      // Show profile setup if needed
+      if (currentProfile && (!currentProfile.nombre || currentProfile.nombre.length <= 2)) {
+        setTimeout(showProfileSetup, 800);
+      }
     } catch(e) { console.error('App init error:', e); showToast('Error cargando datos: ' + e.message); }
   } else {
+    appInitialized = false;
     currentUser = null;
     currentProfile = null;
     showAuth();
