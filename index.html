@@ -5453,44 +5453,13 @@ async function doLogin() {
   if (btn) { btn.disabled = true; btn.textContent = 'Entrando…'; }
 
   try {
-    const { data, error } = await _sb.auth.signInWithPassword({ email, password: pass });
+    const { error } = await _sb.auth.signInWithPassword({ email, password: pass });
 
     if (error) {
       if (errEl) { errEl.textContent = translateAuthError(error.message); errEl.classList.add('show'); }
       if (btn) { btn.disabled=false; btn.textContent='Entrar'; }
-      return;
     }
-
-    // Login OK — onAuthStateChange should fire, but as fallback trigger manually
-    if (data?.session) {
-      // Give onAuthStateChange 2 seconds to fire naturally
-      const fired = await new Promise(resolve => {
-        const t = setTimeout(() => resolve(false), 2000);
-        const unsub = _sb.auth.onAuthStateChange((event, session) => {
-          if (event === 'SIGNED_IN') { clearTimeout(t); unsub?.data?.subscription?.unsubscribe(); resolve(true); }
-        });
-      });
-
-      if (!fired) {
-        // Manual fallback — init app directly
-        console.log('onAuthStateChange did not fire — manual init');
-        currentUser = data.session.user;
-        try { await loadProfile(); } catch(e) { console.warn(e); }
-        showApp();
-        try {
-          await loadAllData();
-          setupRealtimeSubscriptions();
-          setupPresence();
-          updateTopbarUser();
-          renderSidebar();
-          renderDashboard();
-          nav('dashboard');
-        } catch(e) {
-          console.error('Manual init error:', e);
-          showToast('Error al cargar datos: ' + e.message);
-        }
-      }
-    }
+    // On success: onAuthStateChange fires SIGNED_IN and handles all app initialization
   } catch(e) {
     console.error('Login error:', e);
     if (errEl) { errEl.textContent = 'Error de conexión. Comprueba tu internet.'; errEl.classList.add('show'); }
