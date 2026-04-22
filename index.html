@@ -5450,51 +5450,61 @@ async function doLogin() {
     if (errEl) { errEl.textContent='Introduce email y contraseña'; errEl.classList.add('show'); }
     return;
   }
-  if (btn) { btn.disabled = true; btn.textContent = 'Entrando…'; }
+  if (btn) { btn.disabled=true; btn.textContent='Entrando…'; }
 
   try {
     const { data, error } = await _sb.auth.signInWithPassword({ email, password: pass });
 
     if (error) {
-      if (errEl) { errEl.textContent = translateAuthError(error.message); errEl.classList.add('show'); }
+      if (errEl) { errEl.textContent=translateAuthError(error.message); errEl.classList.add('show'); }
       if (btn) { btn.disabled=false; btn.textContent='Entrar'; }
       return;
     }
 
-    // Login OK — onAuthStateChange should fire, but as fallback trigger manually
     if (data?.session) {
-      // Give onAuthStateChange 2 seconds to fire naturally
-      const fired = await new Promise(resolve => {
-        const t = setTimeout(() => resolve(false), 2000);
-        const unsub = _sb.auth.onAuthStateChange((event, session) => {
-          if (event === 'SIGNED_IN') { clearTimeout(t); unsub?.data?.subscription?.unsubscribe(); resolve(true); }
-        });
-      });
-
-      if (!fired) {
-        // Manual fallback — init app directly
-        console.log('onAuthStateChange did not fire — manual init');
-        currentUser = data.session.user;
-        try { await loadProfile(); } catch(e) { console.warn(e); }
-        showApp();
-        try {
-          await loadAllData();
-          setupRealtimeSubscriptions();
-          setupPresence();
-          updateTopbarUser();
-          renderSidebar();
-          renderDashboard();
-          nav('dashboard');
-        } catch(e) {
-          console.error('Manual init error:', e);
-          showToast('Error al cargar datos: ' + e.message);
-        }
-      }
+      // Init app directly — don't wait for onAuthStateChange
+      await initApp(data.session);
+    } else {
+      if (btn) { btn.disabled=false; btn.textContent='Entrar'; }
+      if (errEl) { errEl.textContent='No se pudo iniciar sesión. Inténtalo de nuevo.'; errEl.classList.add('show'); }
     }
+
   } catch(e) {
     console.error('Login error:', e);
-    if (errEl) { errEl.textContent = 'Error de conexión. Comprueba tu internet.'; errEl.classList.add('show'); }
+    if (errEl) { errEl.textContent='Error de conexión: '+e.message; errEl.classList.add('show'); }
     if (btn) { btn.disabled=false; btn.textContent='Entrar'; }
+  }
+}
+
+async function initApp(session) {
+  if (appInitialized && currentUser?.id === session.user.id) return;
+  appInitialized = true;
+  currentUser = session.user;
+  try { await loadProfile(); } catch(e) { console.warn('loadProfile:', e); }
+  showApp();
+  try {
+    await loadAllData();
+    setupRealtimeSubscriptions();
+    setupPresence();
+    updateTopbarUser();
+    renderSidebar();
+    renderDashboard();
+    nav('dashboard');
+    if (currentProfile && (!currentProfile.nombre || currentProfile.nombre.length <= 2)) {
+      setTimeout(showProfileSetup, 800);
+    }
+    // Final safety check — remove anything that might block clicks
+    setTimeout(() => {
+      document.querySelectorAll('[style*="z-index: 9000"], [style*="z-index:9000"], [style*="z-index: 8000"], [style*="z-index:8000"]').forEach(el => {
+        if (el.id !== 'modal' && el.id !== 'search-overlay' && el.id !== 'task-detail-overlay') {
+          el.style.display = 'none';
+          el.style.pointerEvents = 'none';
+        }
+      });
+    }, 500);
+  } catch(e) {
+    console.error('initApp error:', e);
+    showToast('Error cargando datos: ' + e.message);
   }
 }
 
@@ -5520,12 +5530,11 @@ async function doRegister() {
     errEl.classList.add('show');
     btn.disabled=false; btn.textContent='Crear cuenta';
   } else if (data?.session) {
-    // Email confirmation disabled — logged in directly
-    btn.textContent='Entrando…';
+    // Confirmation disabled — init app directly
+    await initApp(data.session);
   } else {
-    // Email confirmation enabled — tell user to check email but keep button active
     errEl.style.color='var(--green)';
-    errEl.textContent='✓ Cuenta creada. Si no recibes email, pide al administrador que desactive la confirmación en Supabase → Authentication → Email.';
+    errEl.textContent='✓ Cuenta creada. Si no recibes email, desactiva la confirmación en Supabase → Authentication → Email.';
     errEl.classList.add('show');
     btn.disabled=false; btn.textContent='Crear cuenta';
   }
@@ -5579,19 +5588,21 @@ function translateAuthError(msg) {
 function getEl(id) { return document.getElementById(id); }
 
 function showApp() {
+  // Remove auth-screen from DOM completely so it can never block clicks
   const auth = getEl('auth-screen');
-  const app  = getEl('app-shell');
-  if (auth) {
-    auth.style.display      = 'none';
-    auth.style.zIndex       = '-1';
-    auth.style.pointerEvents = 'none';
-    auth.style.visibility   = 'hidden';
-  }
+  if (auth) auth.remove();
+
+  const app = getEl('app-shell');
   if (app) {
-    app.style.display       = '';
+    app.style.display      = '';
+    app.style.visibility   = 'visible';
     app.style.pointerEvents = 'auto';
-    app.style.visibility    = 'visible';
+    app.style.zIndex       = '';
   }
+
+  // Also remove any loading overlay
+  const overlay = getEl('loading-overlay');
+  if (overlay) overlay.remove();
 }
 
 function showAuth() {
@@ -5604,27 +5615,9 @@ function showAuth() {
 let appInitialized = false;
 
 _sb.auth.onAuthStateChange(async (event, session) => {
-  if (session?.user) {
-    // Prevent double initialization if manual fallback already ran
-    if (appInitialized && currentUser?.id === session.user.id) return;
-    appInitialized = true;
-    currentUser = session.user;
-    try { await loadProfile(); } catch(e) { console.warn('loadProfile:', e); }
-    showApp();
-    try {
-      await loadAllData();
-      setupRealtimeSubscriptions();
-      setupPresence();
-      updateTopbarUser();
-      renderSidebar();
-      renderDashboard();
-      nav('dashboard');
-      // Show profile setup if needed
-      if (currentProfile && (!currentProfile.nombre || currentProfile.nombre.length <= 2)) {
-        setTimeout(showProfileSetup, 800);
-      }
-    } catch(e) { console.error('App init error:', e); showToast('Error cargando datos: ' + e.message); }
-  } else {
+  if (event === 'SIGNED_IN' && session?.user) {
+    await initApp(session);
+  } else if (event === 'SIGNED_OUT') {
     appInitialized = false;
     currentUser = null;
     currentProfile = null;
@@ -6093,8 +6086,12 @@ function showLoadingOverlay(msg='Cargando…') {
   document.getElementById('loading-msg').textContent=msg;
 }
 function hideLoadingOverlay() {
-  const el=document.getElementById('loading-overlay');
-  if(el) el.style.display='none';
+  const el = document.getElementById('loading-overlay');
+  if (el) {
+    el.style.display = 'none';
+    el.style.pointerEvents = 'none';
+    el.style.zIndex = '-1';
+  }
 }
 
 // ── CHAT WITH SUPABASE ─────────────────────────────────────────
