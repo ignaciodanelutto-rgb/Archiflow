@@ -5459,8 +5459,9 @@ async function doLogin() {
     if (error) {
       if (errEl) { errEl.textContent = translateAuthError(error.message); errEl.classList.add('show'); }
       if (btn) { btn.disabled=false; btn.textContent='Entrar'; }
+    } else {
+      showApp(); // hide auth screen immediately; onAuthStateChange completes initialization
     }
-    // On success: onAuthStateChange fires SIGNED_IN and handles all app initialization
   } catch(e) {
     console.error('Login error:', e);
     if (errEl) { errEl.textContent = 'Error de conexión. Comprueba tu internet.'; errEl.classList.add('show'); }
@@ -5575,8 +5576,7 @@ let appInitialized = false;
 
 _sb.auth.onAuthStateChange(async (event, session) => {
   if (session?.user) {
-    // Prevent double initialization if manual fallback already ran
-    if (appInitialized && currentUser?.id === session.user.id) return;
+    if (appInitialized && currentUser?.id === session.user.id) { showApp(); return; }
     appInitialized = true;
     currentUser = session.user;
     try { await loadProfile(); } catch(e) { console.warn('loadProfile:', e); }
