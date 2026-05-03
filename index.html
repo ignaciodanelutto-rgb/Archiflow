@@ -5517,6 +5517,8 @@ async function initApp(session) {
   } catch(e) {
     console.error('initApp error:', e);
     showToast('Error cargando datos: ' + e.message);
+  } finally {
+    hideLoadingOverlay();
   }
 }
 
@@ -5600,21 +5602,17 @@ function translateAuthError(msg) {
 function getEl(id) { return document.getElementById(id); }
 
 function showApp() {
-  // Remove auth-screen from DOM completely so it can never block clicks
+  // Remove auth-screen from DOM completely
   const auth = getEl('auth-screen');
   if (auth) auth.remove();
 
   const app = getEl('app-shell');
   if (app) {
-    app.style.display      = '';
-    app.style.visibility   = 'visible';
+    app.style.display       = '';
+    app.style.visibility    = 'visible';
     app.style.pointerEvents = 'auto';
-    app.style.zIndex       = '';
+    app.style.zIndex        = '';
   }
-
-  // Also remove any loading overlay
-  const overlay = getEl('loading-overlay');
-  if (overlay) overlay.remove();
 }
 
 function showAuth() {
@@ -5702,46 +5700,48 @@ function updateTopbarUser() {
 
 // ── DATA LOAD ─────────────────────────────────────────────────
 async function loadAllData() {
-  showLoadingOverlay('Cargando proyectos…');
-  try {
-    const [
-      { data: proyectos },
-      { data: tareas },
-      { data: tiempos },
-      { data: timeLogs },
-      { data: notas },
-      { data: facturas },
-      { data: visitas },
-      { data: clientes },
-      { data: licencias },
-      { data: profiles },
-    ] = await Promise.all([
-      _sb.from('proyectos').select('*').order('anno', {ascending:false}).order('nombre'),
-      _sb.from('tareas').select('*').order('created_at', {ascending:false}),
-      _sb.from('tiempos').select('*').order('fecha', {ascending:false}),
-      _sb.from('time_logs').select('*').order('created_at', {ascending:false}),
-      _sb.from('notas').select('*').order('fecha', {ascending:false}),
-      _sb.from('facturas').select('*').order('fecha', {ascending:false}),
-      _sb.from('visitas').select('*').order('fecha', {ascending:false}),
-      _sb.from('clientes').select('*').order('nombre'),
-      _sb.from('licencias').select('*').order('created_at', {ascending:false}),
-      _sb.from('profiles').select('*'),
+  showLoadingOverlay('Cargando datos…');
+  
+  // Helper: fetch a table safely, return [] on error
+  async function safeFetch(table, query) {
+    try {
+      const { data, error } = await query;
+      if (error) { console.warn('safeFetch ' + table + ':', error.message); return []; }
+      return data || [];
+    } catch(e) { console.warn('safeFetch ' + table + ' exception:', e); return []; }
+  }
+
+  const [proyectos, tareas, tiempos, timeLogs, notas, facturas, visitas, clientes, licencias, profiles] = 
+    await Promise.all([
+      safeFetch('proyectos', _sb.from('proyectos').select('*').order('created_at', {ascending:false})),
+      safeFetch('tareas',    _sb.from('tareas').select('*').order('created_at', {ascending:false})),
+      safeFetch('tiempos',   _sb.from('tiempos').select('*').order('fecha', {ascending:false})),
+      safeFetch('time_logs', _sb.from('time_logs').select('*').order('created_at', {ascending:false})),
+      safeFetch('notas',     _sb.from('notas').select('*').order('created_at', {ascending:false})),
+      safeFetch('facturas',  _sb.from('facturas').select('*').order('created_at', {ascending:false})),
+      safeFetch('visitas',   _sb.from('visitas').select('*').order('fecha', {ascending:false})),
+      safeFetch('clientes',  _sb.from('clientes').select('*').order('nombre')),
+      safeFetch('licencias', _sb.from('licencias').select('*').order('created_at', {ascending:false})),
+      safeFetch('profiles',  _sb.from('profiles').select('*')),
     ]);
 
-    // Map to app's internal format (snake_case → camelCase)
-    db.proyectos = (proyectos||[]).map(mapProyecto);
-    db.tareas    = (tareas||[]).map(mapTarea);
-    db.tiempos   = (tiempos||[]).map(mapTiempo);
-    db.timeLogs  = (timeLogs||[]).map(mapTimeLog);
-    db.notas     = (notas||[]).map(mapNota);
-    db.facturas  = (facturas||[]).map(mapFactura);
-    db.visitas   = (visitas||[]).map(mapVisita);
-    db.clientes  = (clientes||[]).map(mapCliente);
-    db.licencias = (licencias||[]).map(mapLicencia);
+  db.proyectos = proyectos.map(mapProyecto);
+  db.tareas    = tareas.map(mapTarea);
+  db.tiempos   = tiempos.map(mapTiempo);
+  db.timeLogs  = timeLogs.map(mapTimeLog);
+  db.notas     = notas.map(mapNota);
+  db.facturas  = facturas.map(mapFactura);
+  db.visitas   = visitas.map(mapVisita);
+  db.clientes  = clientes.map(mapCliente);
+  db.licencias = licencias.map(mapLicencia);
     db.profiles  = profiles||[];
 
-  } catch(e) { console.error('loadAllData error:', e); showToast('Error cargando datos: '+e.message); }
-  hideLoadingOverlay();
+  } catch(e) { 
+    console.error('loadAllData error:', e); 
+    showToast('Error cargando datos: ' + e.message);
+  } finally {
+    hideLoadingOverlay();
+  }
 }
 
 // ── MAPPERS (DB → app format) ─────────────────────────────────
