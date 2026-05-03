@@ -1516,6 +1516,7 @@ function renderTagSug(q){const c=document.getElementById('etag-sug');if(!c)retur
 // ══ NAVIGATION ══
 let curProjId=null,curProjTab='general';
 function nav(id,projId){
+  console.log('[nav] →', id, projId||'');
   // Hide all views — remove both active class AND inline style
   document.querySelectorAll('.view').forEach(v=>{
     v.classList.remove('active');
@@ -1538,21 +1539,30 @@ function nav(id,projId){
   const ab=document.getElementById('tb-action');
   ab.textContent=acts[id]||'';ab.style.display=acts[id]?'':'none';
   ab.onclick=()=>openM(actM[id]||'tarea');
-  if(id==='dashboard')renderDashboard();
-  else if(id==='kanban'){initKanbanFilterSelects();renderKanbanFiltered();}
-  else if(id==='calendario'){ if(calView==='mes') renderCalendario(); else renderAgendaSemanal(); }
-  else if(id==='equipo')renderEquipo();
-  else if(id==='alertas')renderAlertas();
-  else if(id==='tiempo')renderTiempo();
-  else if(id==='notas')renderNotas();
-  else if(id==='facturacion')renderFacturacion();
-  else if(id==='obra')renderObra();
-  else if(id==='control'){initCtrlSelect();renderCtrl();}
-  else if(id==='visado'){initVisado();}
-  else if(id==='clientes'){renderClientes();}
-  else if(id==='licencias'){renderLicencias();}
-  else if(id==='normativa'){renderNormativa();}
-  else if(id==='proyecto'&&projId){curProjId=projId;renderProyecto(projId);}
+  // Render content safely — never let render errors break navigation
+  try {
+    if(id==='dashboard') renderDashboard();
+    else if(id==='kanban'){ if(typeof initKanbanFilterSelects==='function')initKanbanFilterSelects(); if(typeof renderKanbanFiltered==='function')renderKanbanFiltered(); else if(typeof renderKanban==='function')renderKanban(); }
+    else if(id==='calendario'){ if(typeof calView!=='undefined' && calView==='semana' && typeof renderAgendaSemanal==='function') renderAgendaSemanal(); else if(typeof renderCalendario==='function') renderCalendario(); }
+    else if(id==='equipo') renderEquipo();
+    else if(id==='alertas') renderAlertas();
+    else if(id==='tiempo') renderTiempo();
+    else if(id==='notas') renderNotas();
+    else if(id==='facturacion') renderFacturacion();
+    else if(id==='obra') renderObra();
+    else if(id==='control'){ initCtrlSelect(); renderCtrl(); }
+    else if(id==='visado'){ initVisado(); }
+    else if(id==='clientes'){ renderClientes(); }
+    else if(id==='licencias'){ renderLicencias(); }
+    else if(id==='normativa'){ renderNormativa(); }
+    else if(id==='proyecto' && projId){ curProjId = projId; renderProyecto(projId); }
+  } catch(e) {
+    console.error('Error renderizando ' + id + ':', e);
+    const view = document.getElementById('view-' + id);
+    if (view && !view.innerHTML.trim()) {
+      view.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3)"><div style="font-size:32px;margin-bottom:10px">⚠️</div><div>Error cargando este módulo</div><div style="font-size:11px;margin-top:8px;color:var(--text3)">' + e.message + '</div></div>';
+    }
+  }
 }
 
 // ══ SIDEBAR ══
@@ -5438,6 +5448,7 @@ const _sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let currentUser = null;
 let currentProfile = null;
 let onlineUsers = {};
+let appInitialized = false;
 
 // ── AUTH ──────────────────────────────────────────────────────
 function switchAuthTab(tab) {
@@ -5621,8 +5632,6 @@ function showAuth() {
   if (auth) auth.style.cssText = 'position:fixed;inset:0;background:var(--bg);z-index:9000;display:flex;align-items:center;justify-content:center;';
   if (app)  app.style.display = 'none';
 }
-
-let appInitialized = false;
 
 _sb.auth.onAuthStateChange(async (event, session) => {
   if (event === 'SIGNED_IN' && session?.user) {
@@ -6385,11 +6394,10 @@ function addActivity(txt, icon='📋', bg='var(--bg3)') {
 // ══ INIT ══
 // Wait for DOM before touching any elements
 window.addEventListener('DOMContentLoaded', () => {
-  // Start: auth visible, app hidden
   const authEl = document.getElementById('auth-screen');
   const appShell = document.getElementById('app-shell');
   if (appShell) appShell.style.display = 'none';
-  if (authEl) authEl.style.display = 'flex'; // show login by default
+  if (authEl) authEl.style.display = 'flex';
 
   // Check for password recovery flow (hash from email link)
   const hash = window.location.hash;
@@ -6401,8 +6409,11 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   _sb.auth.getSession().then(({ data: { session } }) => {
-    if (!session) {
-      hideLoadingOverlay();
+    hideLoadingOverlay();
+    if (session) {
+      // Existing session — initialize app
+      initApp(session).catch(e => { console.error('Auto-init failed:', e); showAuth(); });
+    } else {
       showAuth();
     }
   }).catch(e => {
