@@ -5711,38 +5711,39 @@ function updateTopbarUser() {
 async function loadAllData() {
   showLoadingOverlay('Cargando datos…');
   
-  // Helper: fetch a table safely, return [] on error
-  async function safeFetch(table, query) {
-    try {
-      const { data, error } = await query;
-      if (error) { console.warn('safeFetch ' + table + ':', error.message); return []; }
-      return data || [];
-    } catch(e) { console.warn('safeFetch ' + table + ' exception:', e); return []; }
-  }
+  try {
+    // Helper: fetch a table safely, return [] on error
+    async function safeFetch(table, query) {
+      try {
+        const { data, error } = await query;
+        if (error) { console.warn('safeFetch ' + table + ':', error.message); return []; }
+        return data || [];
+      } catch(e) { console.warn('safeFetch ' + table + ' exception:', e); return []; }
+    }
 
-  const [proyectos, tareas, tiempos, timeLogs, notas, facturas, visitas, clientes, licencias, profiles] = 
-    await Promise.all([
-      safeFetch('proyectos', _sb.from('proyectos').select('*').order('created_at', {ascending:false})),
-      safeFetch('tareas',    _sb.from('tareas').select('*').order('created_at', {ascending:false})),
-      safeFetch('tiempos',   _sb.from('tiempos').select('*').order('fecha', {ascending:false})),
-      safeFetch('time_logs', _sb.from('time_logs').select('*').order('created_at', {ascending:false})),
-      safeFetch('notas',     _sb.from('notas').select('*').order('created_at', {ascending:false})),
-      safeFetch('facturas',  _sb.from('facturas').select('*').order('created_at', {ascending:false})),
-      safeFetch('visitas',   _sb.from('visitas').select('*').order('fecha', {ascending:false})),
-      safeFetch('clientes',  _sb.from('clientes').select('*').order('nombre')),
-      safeFetch('licencias', _sb.from('licencias').select('*').order('created_at', {ascending:false})),
-      safeFetch('profiles',  _sb.from('profiles').select('*')),
-    ]);
+    const [proyectos, tareas, tiempos, timeLogs, notas, facturas, visitas, clientes, licencias, profiles] = 
+      await Promise.all([
+        safeFetch('proyectos', _sb.from('proyectos').select('*').order('created_at', {ascending:false})),
+        safeFetch('tareas',    _sb.from('tareas').select('*').order('created_at', {ascending:false})),
+        safeFetch('tiempos',   _sb.from('tiempos').select('*').order('fecha', {ascending:false})),
+        safeFetch('time_logs', _sb.from('time_logs').select('*').order('created_at', {ascending:false})),
+        safeFetch('notas',     _sb.from('notas').select('*').order('created_at', {ascending:false})),
+        safeFetch('facturas',  _sb.from('facturas').select('*').order('created_at', {ascending:false})),
+        safeFetch('visitas',   _sb.from('visitas').select('*').order('fecha', {ascending:false})),
+        safeFetch('clientes',  _sb.from('clientes').select('*').order('nombre')),
+        safeFetch('licencias', _sb.from('licencias').select('*').order('created_at', {ascending:false})),
+        safeFetch('profiles',  _sb.from('profiles').select('*')),
+      ]);
 
-  db.proyectos = proyectos.map(mapProyecto);
-  db.tareas    = tareas.map(mapTarea);
-  db.tiempos   = tiempos.map(mapTiempo);
-  db.timeLogs  = timeLogs.map(mapTimeLog);
-  db.notas     = notas.map(mapNota);
-  db.facturas  = facturas.map(mapFactura);
-  db.visitas   = visitas.map(mapVisita);
-  db.clientes  = clientes.map(mapCliente);
-  db.licencias = licencias.map(mapLicencia);
+    db.proyectos = proyectos.map(mapProyecto);
+    db.tareas    = tareas.map(mapTarea);
+    db.tiempos   = tiempos.map(mapTiempo);
+    db.timeLogs  = timeLogs.map(mapTimeLog);
+    db.notas     = notas.map(mapNota);
+    db.facturas  = facturas.map(mapFactura);
+    db.visitas   = visitas.map(mapVisita);
+    db.clientes  = clientes.map(mapCliente);
+    db.licencias = licencias.map(mapLicencia);
     db.profiles  = profiles||[];
 
   } catch(e) { 
