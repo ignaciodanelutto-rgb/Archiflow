@@ -764,7 +764,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);overflow:hid
 </div>
 
 <!-- ══ APP SHELL ══ -->
-<div id="app-shell">
+<div id="app-shell" style="display:flex;height:100vh;width:100%;">
 
 <!-- SEARCH OVERLAY -->
 <div class="search-overlay" id="search-overlay" onclick="if(event.target===this)closeSearch()">
@@ -5619,7 +5619,9 @@ function showApp() {
 
   const app = getEl('app-shell');
   if (app) {
-    app.style.display       = '';
+    app.style.display       = 'flex'; // sidebar | main side by side
+    app.style.height        = '100vh';
+    app.style.width         = '100%';
     app.style.visibility    = 'visible';
     app.style.pointerEvents = 'auto';
     app.style.zIndex        = '';
