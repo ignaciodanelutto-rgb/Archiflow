@@ -2106,7 +2106,7 @@ function renderNotas(filterPId){
   const filtered=db.notas.filter(n=>(!q||(n.titulo+n.contenido).toLowerCase().includes(q))&&(!filterPId||n.proyectoId===filterPId));
   grid.innerHTML=filtered.map(n=>{const p=db.proyectos.find(p=>p.id===n.proyectoId);return`<div class="nc" onclick="openM('editNota','${n.id}')"><div class="nt">${n.titulo}</div><div class="ne">${n.contenido.substring(0,110)}${n.contenido.length>110?'…':''}</div><div class="nf"><div class="nd">${n.fecha}</div>${p?`<div class="npt">${p.nombre.split(' ').slice(0,2).join(' ')}</div>`:'<div class="npt">General</div>'}<button class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:10.5px" onclick="event.stopPropagation();delNota('${n.id}')">✕</button></div></div>`;}).join('')||'<div style="color:var(--text3);font-size:13px">Sin notas.</div>';
 }
-function delNota(id){doConfirm('Eliminar nota','¿Eliminar esta nota?',()=>{db.notas=db.notas.filter(n=>n.id!==id);saveDB(db);renderNotas();showToast('Nota eliminada');});}
+// delNota — defined as async at end of file (Supabase version)
 
 // ══ FACTURACIÓN ══
 function renderFacturacion(filterPId){
@@ -2126,7 +2126,7 @@ function renderFacturacion(filterPId){
     <div style="background:var(--bg3);border-radius:var(--r);padding:12px 14px;margin-bottom:9px"><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Pendiente</div><div style="font-size:20px;font-family:var(--fs);color:var(--amber)">${fmt(pen)}</div></div>
     ${ov?`<div style="background:var(--red-bg);border-radius:var(--r);padding:12px 14px;margin-bottom:9px;border:1px solid var(--red-bg)"><div style="font-size:10px;color:var(--red);text-transform:uppercase;letter-spacing:.7px;margin-bottom:4px">Vencido ⚠</div><div style="font-size:20px;font-family:var(--fs);color:var(--red)">${fmt(ov)}</div></div>`:''}`;
 }
-function delFactura(id){doConfirm('Eliminar factura','¿Eliminar esta factura?',()=>{db.facturas=db.facturas.filter(f=>f.id!==id);saveDB(db);renderFacturacion();showToast('Factura eliminada');});}
+// delFactura — defined as async at end of file (Supabase version)
 
 // ══ PDF ══
 function exportPDF(id){
@@ -2576,72 +2576,7 @@ const TEMPLATES={
   ejec:['Planos de estructura con IEF','Planos instalaciones eléctricas','Planos instalaciones fontanería','Detalles constructivos carpintería','Mediciones y presupuesto detallado','Pliego de condiciones','Coordinación con industriales','Revisión final y entrega documentación','Plan de gestión de residuos','Estudio seguridad y salud completo'],
   obra:['Acta de replanteo','Visita obra semanal','Control de calidad materiales','Libro de órdenes','Gestión de incidencias en obra','Certificaciones mensuales','Acta final de obra','Documentación para libro del edificio'],
 };
-function saveTarea(id){
-  const titulo=document.getElementById('f-titulo').value.trim();if(!titulo){showToast('El título es obligatorio');return;}
-  const data={titulo,proyectoId:document.getElementById('f-proj').value,fase:document.getElementById('f-fase').value,asignado:document.getElementById('f-asignado').value,vence:document.getElementById('f-vence').value,prioridad:document.getElementById('f-prior').value,estado:document.getElementById('f-estado').value,etiquetas:[...editTags]};
-  if(id){Object.assign(db.tareas.find(t=>t.id===id),data);addActivity(`Tarea <strong>${titulo}</strong> actualizada`,'✏️','var(--blue-bg)');}
-  else{db.tareas.push({id:uid(),...data});addActivity(`Nueva tarea <strong>${titulo}</strong>`,'✅','var(--green-bg)');}
-  saveDB(db);closeM();renderSidebar();
-  if(document.getElementById('view-kanban').classList.contains('active'))renderKanban();
-  if(document.getElementById('view-proyecto').classList.contains('active'))renderProyecto(curProjId);
-  showToast('Tarea guardada ✓','ok');
-}
-function delTarea(id){closeM();doConfirm('Eliminar tarea','¿Eliminar esta tarea?',()=>{db.tareas=db.tareas.filter(t=>t.id!==id);saveDB(db);renderSidebar();renderKanban();if(document.getElementById('view-proyecto').classList.contains('active'))renderProyecto(curProjId);showToast('Tarea eliminada');});}
-function saveProyecto(id){
-  const nombre=document.getElementById('f-nombre').value.trim();if(!nombre){showToast('El nombre es obligatorio');return;}
-  const fase=document.getElementById('f-fase').value;
-  const data={nombre,cliente:document.getElementById('f-cliente').value,ref:document.getElementById('f-ref').value,fase,entrega:document.getElementById('f-entrega').value,color:document.getElementById('f-color').value,progreso:parseInt(document.getElementById('f-prog').value)||0,anno:parseInt(document.getElementById('f-anno')?.value)||new Date().getFullYear()};
-  let projId=id;
-  if(id){Object.assign(db.proyectos.find(p=>p.id===id),data);addActivity(`Proyecto <strong>${nombre}</strong> actualizado`,'🏗️','var(--accent-bg)');}
-  else{projId=uid();db.proyectos.push({id:projId,...data});addActivity(`Nuevo proyecto <strong>${nombre}</strong>`,'🏗️','var(--accent-bg)');
-    // Apply template
-    const tplKey={ante:'ante',basico:'basico',ejecucion:'ejec',obra:'obra',ejec:'ejec'}[selTpl]||selTpl;
-    if(tplKey&&TEMPLATES[tplKey]){
-      TEMPLATES[tplKey].forEach(titulo=>{db.tareas.push({id:uid(),titulo,proyectoId:projId,fase,asignado:'IM',vence:'',estado:'pendiente',prioridad:'normal',etiquetas:[]});});
-      showToast(`${TEMPLATES[tplKey].length} tareas creadas desde plantilla`,'ok');
-    }
-  }
-  saveDB(db);closeM();renderSidebar();
-  if(document.getElementById('view-dashboard').classList.contains('active'))renderDashboard();
-  showToast('Proyecto guardado ✓','ok');
-}
-function delProyecto(id){closeM();doConfirm('Eliminar proyecto','¿Eliminar este proyecto y todos sus datos?',()=>{db.proyectos=db.proyectos.filter(p=>p.id!==id);db.tareas=db.tareas.filter(t=>t.proyectoId!==id);db.tiempos=db.tiempos.filter(t=>t.proyectoId!==id);db.facturas=db.facturas.filter(f=>f.proyectoId!==id);saveDB(db);renderSidebar();nav('dashboard');showToast('Proyecto eliminado');});}
-function saveNota(id){
-  const titulo=document.getElementById('f-titulo').value.trim();if(!titulo){showToast('El título es obligatorio');return;}
-  const data={titulo,contenido:document.getElementById('f-contenido').value,proyectoId:document.getElementById('f-proj').value||null,fecha:new Date().toISOString().split('T')[0]};
-  if(id){Object.assign(db.notas.find(n=>n.id===id),data);}else{db.notas.unshift({id:uid(),...data});addActivity(`Nueva nota <strong>${titulo}</strong>`,'📝','var(--blue-bg)');}
-  saveDB(db);closeM();
-  if(document.getElementById('view-notas').classList.contains('active'))renderNotas();
-  if(document.getElementById('view-proyecto').classList.contains('active')&&curProjTab==='documentos')renderProyecto(curProjId);
-  showToast('Nota guardada ✓','ok');
-}
-function saveFactura(){
-  const cliente=document.getElementById('f-cliente').value.trim();const concepto=document.getElementById('f-concepto').value.trim();const importe=parseFloat(document.getElementById('f-importe').value)||0;
-  if(!cliente||!concepto){showToast('Cliente y concepto son obligatorios');return;}
-  const f={id:uid(),numero:document.getElementById('f-numero').value,cliente,proyectoId:document.getElementById('f-proj').value||null,concepto,importe,fecha:document.getElementById('f-fecha').value,estado:document.getElementById('f-estado').value,notas:document.getElementById('f-notas').value};
-  db.facturas.unshift(f);saveDB(db);closeM();
-  if(document.getElementById('view-facturacion').classList.contains('active'))renderFacturacion();
-  if(document.getElementById('view-proyecto').classList.contains('active')&&curProjTab==='facturacion')renderProyecto(curProjId);
-  addActivity(`Factura <strong>#${f.numero}</strong> — ${fmt(importe)}`,'💶','var(--amber-bg)');showToast('Factura guardada ✓','ok');
-}
-function saveManualTime(){
-  const projId=document.getElementById('f-proj').value;const horas=parseFloat(document.getElementById('f-horas').value)||0;
-  if(!projId||!horas){showToast('Proyecto y horas son obligatorios');return;}
-  db.tiempos.push({id:uid(),proyectoId:projId,tarea:document.getElementById('f-tarea').value||'Trabajo general',tecnico:document.getElementById('f-tecnico').value,fase:document.getElementById('f-fase').value,fecha:document.getElementById('f-fecha').value,horas});
-  saveDB(db);closeM();
-  if(document.getElementById('view-tiempo').classList.contains('active'))renderTiempo();
-  if(document.getElementById('view-proyecto').classList.contains('active')&&curProjTab==='tiempo')renderProyecto(curProjId);
-  addActivity(`${horas}h en <strong>${pname(projId)}</strong>`,'⏱','var(--amber-bg)');showToast('Horas guardadas ✓','ok');
-}
-function saveVisita(){
-  const projId=document.getElementById('f-proj').value;if(!projId){showToast('Selecciona un proyecto');return;}
-  const rawCl=document.getElementById('f-checklist').value.split('\n').filter(s=>s.trim());
-  const rawInc=document.getElementById('f-incidencias').value.split('\n').filter(s=>s.trim());
-  const v={id:uid(),proyectoId:projId,fecha:document.getElementById('f-fecha').value,tecnico:document.getElementById('f-tecnico').value,checklist:rawCl.map(t=>({t:t.trim(),ok:false})),incidencias:rawInc.map(t=>({texto:t.trim(),estado:'abierta'})),notas:document.getElementById('f-notas').value};
-  db.visitas.push(v);saveDB(db);closeM();
-  if(document.getElementById('view-obra').classList.contains('active'))renderObra();
-  addActivity(`Nueva acta de visita en <strong>${pname(projId)}</strong>`,'🔍','var(--blue-bg)');showToast('Acta guardada ✓','ok');
-}
+// Old save functions removed — using Supabase versions defined later
 
 // ══ SEARCH (Cmd+K) ══
 let searchFocus=0;
@@ -4205,40 +4140,7 @@ function openMCliente(id) {
   document.getElementById('modal').classList.add('open');
 }
 
-function saveCliente(id) {
-  const nombre = document.getElementById('fc-nombre').value.trim();
-  if (!nombre) { showToast('El nombre es obligatorio'); return; }
-  const proyectsSel = [...document.getElementById('fc-proyectos').selectedOptions].map(o=>o.value);
-  const data = {
-    nombre, tipo: document.getElementById('fc-tipo').value,
-    cif: document.getElementById('fc-cif').value,
-    contacto: document.getElementById('fc-contacto').value,
-    email: document.getElementById('fc-email').value,
-    tel: document.getElementById('fc-tel').value,
-    color: document.getElementById('fc-color').value,
-    direccion: document.getElementById('fc-dir').value,
-    proyectos: proyectsSel,
-    notas: document.getElementById('fc-notas').value,
-  };
-  if (!db.clientes) db.clientes = [];
-  if (id) {
-    Object.assign(db.clientes.find(c=>c.id===id), data);
-    addActivity(`Cliente <strong>${nombre}</strong> actualizado`, '👤', 'var(--blue-bg)');
-  } else {
-    db.clientes.push({ id: uid(), ...data });
-    addActivity(`Nuevo cliente <strong>${nombre}</strong>`, '👤', 'var(--blue-bg)');
-  }
-  saveDB(db); closeM(); renderClientes();
-  showToast('Cliente guardado ✓', 'ok');
-}
-
-function delCliente(id) {
-  closeM();
-  doConfirm('Eliminar cliente', '¿Eliminar este cliente? No se eliminarán sus proyectos ni facturas.', () => {
-    db.clientes = (db.clientes||[]).filter(c=>c.id!==id);
-    saveDB(db); renderClientes(); showToast('Cliente eliminado');
-  });
-}
+// Old localStorage saveCliente/delCliente removed — using Supabase versions
 
 // ══ MODAL: LICENCIA ══
 function openMLicencia(id) {
@@ -4296,42 +4198,7 @@ function openMLicencia(id) {
   document.getElementById('modal').classList.add('open');
 }
 
-function saveLicencia(id) {
-  const projId = document.getElementById('fl-proj').value;
-  if (!projId) { showToast('Selecciona un proyecto'); return; }
-  const data = {
-    proyectoId: projId,
-    tipo:      document.getElementById('fl-tipo').value,
-    organismo: document.getElementById('fl-org').value,
-    refExpediente: document.getElementById('fl-ref').value,
-    estado:    document.getElementById('fl-estado').value,
-    fechaPresentacion:  document.getElementById('fl-fpres').value,
-    fechaResolucionPrev:document.getElementById('fl-fprev').value,
-    fechaResolucion:    document.getElementById('fl-fres').value,
-    silencioAdm: document.getElementById('fl-silencio').checked,
-    diasSilencio: parseInt(document.getElementById('fl-dias-silencio').value)||180,
-    notas: document.getElementById('fl-notas').value,
-  };
-  if (!db.licencias) db.licencias = [];
-  if (id) {
-    const l = db.licencias.find(l=>l.id===id);
-    Object.assign(l, data);
-    if (!l.requerimientos) l.requerimientos = [];
-  } else {
-    db.licencias.push({ id: uid(), ...data, requerimientos:[] });
-    addActivity(`Nueva licencia: <strong>${pname(projId)}</strong>`, '🏛', 'var(--blue-bg)');
-  }
-  saveDB(db); closeM(); renderLicencias();
-  showToast('Licencia guardada ✓', 'ok');
-}
-
-function delLicencia(id) {
-  closeM();
-  doConfirm('Eliminar licencia','¿Eliminar esta licencia?',()=>{
-    db.licencias=(db.licencias||[]).filter(l=>l.id!==id);
-    saveDB(db); renderLicencias(); showToast('Licencia eliminada');
-  });
-}
+// saveLicencia, delLicencia, saveRequerimiento — defined as async at end of file (Supabase versions)
 
 function openMRequerimiento(licId) {
   const title = document.getElementById('m-title');
@@ -4349,19 +4216,6 @@ function openMRequerimiento(licId) {
   footer.innerHTML = `<button class="btn btn-ghost" onclick="closeM()">Cancelar</button>
     <button class="btn btn-primary" onclick="saveRequerimiento('${licId}')">Añadir</button>`;
   document.getElementById('modal').classList.add('open');
-}
-
-function saveRequerimiento(licId) {
-  const txt = document.getElementById('fr-txt').value.trim();
-  if (!txt) { showToast('Describe el requerimiento'); return; }
-  const l = (db.licencias||[]).find(l=>l.id===licId);
-  if (!l) return;
-  if (!l.requerimientos) l.requerimientos = [];
-  l.requerimientos.push({ txt, fecha: document.getElementById('fr-fecha').value, plazo: document.getElementById('fr-plazo').value, estado:'pendiente' });
-  l.estado = 'requerimiento';
-  saveDB(db); closeM(); renderLicencias();
-  addActivity(`Requerimiento en licencia <strong>${pname(l.proyectoId)}</strong>`, '⚠️', 'var(--red-bg)');
-  showToast('Requerimiento añadido', 'ok');
 }
 
 
@@ -5502,35 +5356,27 @@ async function initApp(session) {
   showApp();
   try {
     await loadAllData();
-    setupRealtimeSubscriptions();
-    setupPresence();
-    updateTopbarUser();
-    renderSidebar();
-    renderDashboard();
-    // Clear all view states then nav to dashboard
+  } catch(e) {
+    console.error('loadAllData failed:', e);
+    showToast('Error cargando datos: ' + e.message);
+  }
+  // ── These must happen even if some data load fails ──
+  try { renderSidebar(); } catch(e) { console.warn('renderSidebar:', e); }
+  try { renderDashboard(); } catch(e) { console.warn('renderDashboard:', e); }
+  try { 
     document.querySelectorAll('.view').forEach(v=>{
       v.classList.remove('active');
       v.style.removeProperty('display');
     });
-    nav('dashboard');
-    if (currentProfile && (!currentProfile.nombre || currentProfile.nombre.length <= 2)) {
-      setTimeout(showProfileSetup, 800);
-    }
-    // Final safety check — remove anything that might block clicks
-    setTimeout(() => {
-      document.querySelectorAll('[style*="z-index: 9000"], [style*="z-index:9000"], [style*="z-index: 8000"], [style*="z-index:8000"]').forEach(el => {
-        if (el.id !== 'modal' && el.id !== 'search-overlay' && el.id !== 'task-detail-overlay') {
-          el.style.display = 'none';
-          el.style.pointerEvents = 'none';
-        }
-      });
-    }, 500);
-  } catch(e) {
-    console.error('initApp error:', e);
-    showToast('Error cargando datos: ' + e.message);
-  } finally {
-    hideLoadingOverlay();
+    nav('dashboard'); 
+  } catch(e) { console.error('nav(dashboard) failed:', e); }
+  try { updateTopbarUser(); } catch(e) { console.warn('updateTopbarUser:', e); }
+  try { setupRealtimeSubscriptions(); } catch(e) { console.warn('realtime:', e); }
+  try { setupPresence(); } catch(e) { console.warn('presence:', e); }
+  if (currentProfile && (!currentProfile.nombre || currentProfile.nombre.length <= 2)) {
+    setTimeout(showProfileSetup, 800);
   }
+  hideLoadingOverlay();
 }
 
 async function doRegister() {
@@ -6346,6 +6192,147 @@ async function updateTdpField(tareaId, field, value) {
 }
 
 // Profile modal
+
+// ── Additional Supabase save/delete wrappers ───────────────
+async function saveCliente(id) {
+  const nombre = document.getElementById('fc-nombre')?.value?.trim();
+  if (!nombre) { showToast('El nombre es obligatorio'); return; }
+  const proyectsSel = [...(document.getElementById('fc-proyectos')?.selectedOptions||[])].map(o=>o.value);
+  const data = {
+    nombre, tipo: document.getElementById('fc-tipo')?.value || 'empresa',
+    cif: document.getElementById('fc-cif')?.value || '',
+    contacto: document.getElementById('fc-contacto')?.value || '',
+    email: document.getElementById('fc-email')?.value || '',
+    tel: document.getElementById('fc-tel')?.value || '',
+    color: document.getElementById('fc-color')?.value || '#7aa8d4',
+    direccion: document.getElementById('fc-dir')?.value || '',
+    notas: document.getElementById('fc-notas')?.value || '',
+  };
+  try {
+    const r = await SB.saveCliente(data, id);
+    const mapped = mapCliente(r);
+    mapped.proyectos = proyectsSel;
+    if (id) { const i=db.clientes.findIndex(c=>c.id===id); if(i>=0) db.clientes[i]=mapped; }
+    else db.clientes.push(mapped);
+    closeM(); renderClientes();
+    showToast(id?'Cliente actualizado ✓':'Cliente creado ✓','ok');
+  } catch(e) { showToast('Error: '+e.message); }
+}
+async function delCliente(id) {
+  closeM();
+  doConfirm('Eliminar cliente','¿Eliminar este cliente?',async()=>{
+    try { await SB.deleteCliente(id); db.clientes=db.clientes.filter(c=>c.id!==id); renderClientes(); showToast('Cliente eliminado'); }
+    catch(e) { showToast('Error: '+e.message); }
+  });
+}
+
+async function saveLicencia(id) {
+  const projId = document.getElementById('fl-proj')?.value;
+  if (!projId) { showToast('Selecciona un proyecto'); return; }
+  const data = {
+    proyectoId: projId,
+    tipo: document.getElementById('fl-tipo')?.value || 'obra_mayor',
+    organismo: document.getElementById('fl-org')?.value || '',
+    refExpediente: document.getElementById('fl-ref')?.value || '',
+    estado: document.getElementById('fl-estado')?.value || 'pendiente',
+    fechaPresentacion: document.getElementById('fl-fpres')?.value || '',
+    fechaResolucionPrev: document.getElementById('fl-fprev')?.value || '',
+    fechaResolucion: document.getElementById('fl-fres')?.value || '',
+    silencioAdm: document.getElementById('fl-silencio')?.checked,
+    diasSilencio: parseInt(document.getElementById('fl-dias-silencio')?.value)||180,
+    notas: document.getElementById('fl-notas')?.value || '',
+  };
+  try {
+    const r = await SB.saveLicencia(data, id);
+    const mapped = mapLicencia(r);
+    if (id) { const i=db.licencias.findIndex(l=>l.id===id); if(i>=0) db.licencias[i]=mapped; }
+    else { mapped.requerimientos=[]; db.licencias.push(mapped); addActivity(`Nueva licencia: <strong>${pname(projId)}</strong>`,'🏛','var(--blue-bg)'); }
+    closeM(); renderLicencias();
+    showToast('Licencia guardada ✓','ok');
+  } catch(e) { showToast('Error: '+e.message); }
+}
+async function delLicencia(id) {
+  closeM();
+  doConfirm('Eliminar licencia','¿Eliminar esta licencia?',async()=>{
+    try { await SB.deleteLicencia(id); db.licencias=db.licencias.filter(l=>l.id!==id); renderLicencias(); showToast('Licencia eliminada'); }
+    catch(e) { showToast('Error: '+e.message); }
+  });
+}
+async function saveRequerimiento(licId) {
+  const txt = document.getElementById('fr-txt')?.value?.trim();
+  if (!txt) { showToast('Describe el requerimiento'); return; }
+  const l = db.licencias.find(l=>l.id===licId);
+  if (!l) return;
+  if (!l.requerimientos) l.requerimientos = [];
+  l.requerimientos.push({ txt, fecha:document.getElementById('fr-fecha')?.value, plazo:document.getElementById('fr-plazo')?.value, estado:'pendiente' });
+  l.estado = 'requerimiento';
+  try {
+    await SB.saveLicencia(l, licId);
+    closeM(); renderLicencias();
+    showToast('Requerimiento añadido','ok');
+  } catch(e) { showToast('Error: '+e.message); }
+}
+
+async function saveVisita() {
+  const projId = document.getElementById('f-proj')?.value;
+  if (!projId) { showToast('Selecciona un proyecto'); return; }
+  const rawCl  = (document.getElementById('f-checklist')?.value||'').split('\n').filter(s=>s.trim());
+  const rawInc = (document.getElementById('f-incidencias')?.value||'').split('\n').filter(s=>s.trim());
+  const data = {
+    proyectoId: projId,
+    fecha: document.getElementById('f-fecha')?.value,
+    tecnico: document.getElementById('f-tecnico')?.value || currentProfile?.nombre || '',
+    checklist: rawCl.map(t=>({t:t.trim(),ok:false})),
+    incidencias: rawInc.map(t=>({texto:t.trim(),estado:'abierta'})),
+    fotos: [],
+    notas: document.getElementById('f-notas')?.value || ''
+  };
+  try {
+    const r = await SB.saveVisita(data);
+    db.visitas.push(mapVisita(r));
+    closeM(); 
+    if(document.getElementById('view-obra').classList.contains('active')) renderObra();
+    addActivity(`Nueva acta de visita en <strong>${pname(projId)}</strong>`,'🔍','var(--blue-bg)');
+    showToast('Acta guardada ✓','ok');
+  } catch(e) { showToast('Error: '+e.message); }
+}
+
+async function saveManualTime() {
+  const projId = document.getElementById('f-proj')?.value;
+  const horas  = parseFloat(document.getElementById('f-horas')?.value) || 0;
+  if (!projId || !horas) { showToast('Proyecto y horas son obligatorios'); return; }
+  try {
+    const r = await SB.saveTiempo({
+      proyectoId: projId,
+      tarea: document.getElementById('f-tarea')?.value || 'Trabajo general',
+      tecnico: document.getElementById('f-tecnico')?.value || currentProfile?.nombre || '',
+      fase: document.getElementById('f-fase')?.value || 'ejecucion',
+      fecha: document.getElementById('f-fecha')?.value,
+      horas
+    });
+    db.tiempos.push(mapTiempo(r));
+    closeM();
+    if(document.getElementById('view-tiempo').classList.contains('active')) renderTiempo();
+    addActivity(`${horas}h en <strong>${pname(projId)}</strong>`,'⏱','var(--amber-bg)');
+    showToast('Horas guardadas ✓','ok');
+  } catch(e) { showToast('Error: '+e.message); }
+}
+
+async function delTime(id) {
+  try { 
+    await _sb.from('tiempos').delete().eq('id', id);
+    db.tiempos = db.tiempos.filter(t=>t.id!==id);
+    renderTiempo(); showToast('Eliminado');
+  } catch(e) { showToast('Error: '+e.message); }
+}
+
+async function delFactura(id) {
+  doConfirm('Eliminar factura','¿Eliminar esta factura?',async()=>{
+    try { await _sb.from('facturas').delete().eq('id',id); db.facturas=db.facturas.filter(f=>f.id!==id); renderFacturacion(); showToast('Factura eliminada'); }
+    catch(e) { showToast('Error: '+e.message); }
+  });
+}
+
 function openMUserProfile() {
   const title=document.getElementById('m-title');
   const body=document.getElementById('m-body');
