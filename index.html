@@ -2719,18 +2719,16 @@ async function sendAiMsg(){
   document.getElementById('ai-send-btn').disabled=true;
 
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        model:'claude-sonnet-4-20250514',
-        max_tokens:1000,
+    const resp = await _sb.functions.invoke('claude-ai', {
+      body: {
         system: buildAiSystemPrompt(),
         messages: aiHistory.slice(-10)
-      })
+      }
     });
-    const data=await resp.json();
-    const text=data.content?.map(c=>c.type==='text'?c.text:'').join('')||'Sin respuesta.';
+
+    if (resp.error) throw new Error(resp.error.message || 'Error de la función');
+
+    const text = resp.data?.reply || 'Sin respuesta.';
 
     // replace thinking bubble
     const thinkEl=document.getElementById(thinkId);
@@ -2738,8 +2736,9 @@ async function sendAiMsg(){
     aiHistory.push({role:'assistant',content:text});
 
   }catch(e){
+    console.error('AI error:', e);
     const thinkEl=document.getElementById(thinkId);
-    if(thinkEl){ thinkEl.className='ai-bubble assistant'; thinkEl.textContent='Error al conectar con la IA. Comprueba tu conexión.'; }
+    if(thinkEl){ thinkEl.className='ai-bubble assistant'; thinkEl.textContent='Error: ' + (e.message || 'No se pudo conectar con el asistente.'); }
   }
 
   aiLoading=false;
